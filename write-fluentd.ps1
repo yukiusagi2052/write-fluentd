@@ -3,14 +3,14 @@
 # Unix Epoch Time 基準
 [DateTime] $EpochOrigin = "1970/01/01 09:00:00"
 
-# ConvertTo-ISO8601 timezone
-# [String] $tz = "+0900"
 
 [Int] $PostRequestTimeout = 3 * 1000 #リクエスト・タイムアウト（ms）
 [Long] $PostBodyMaxSize = 1 * 1024 * 1024 #1MB 
 
-# Post Body Buffer
+# Function Result
+[Bool] $WriteFluentdResult = $true
 
+# Post Body Buffer
 [System.Text.StringBuilder] $PostBody = New-Object System.Text.StringBuilder( $PostBodyMaxSize )
 
 # JSONL Working Buffer
@@ -55,7 +55,10 @@ Function PostBody-Commit
 		#　Invoke-RestMethod -Uri $PostURI.ToString() -Method POST -Body $PostBody.ToString()
 
 		# Powershell 2.0以上
-		Invoke-HttpPost -Uri $PostURI.ToString() -Body $PostBody.ToString() > $Null
+		If(-Not(Invoke-HttpPost -Uri $PostURI.ToString() -Body $PostBody.ToString() ))
+		{
+			$WriteFluentdResult = $False
+		}
 	}
 }
 
@@ -116,20 +119,6 @@ Function ConvertTo-UnixEpoch
 	}
 }
 
-<#
-Function ConvertTo-ISO8601
-{
-	Param( [System.Object] $DateTime )
-
-	Try{
-        #2015-09-20T22:19:43+09:00
-		([DateTime] $DateTime).ToString("yyyyMMddTHHmmss$tz")
-	} Catch {
-		Write-Error $Error[0].Exception.ErrorRecord
-		throw $_.Exception
-	}
-}
-#>
 
 function Invoke-HttpPost {
 	[CmdletBinding()]
@@ -350,6 +339,8 @@ Function write-fluentd
 		#Write-Host "Called wtite-fluentd(End)"
 
 		PostBody-Commit
+
+		Write-Output $WriteFluentdResult
 	}
 }
 
