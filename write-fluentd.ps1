@@ -1,7 +1,7 @@
 # << Define Script Local Functions and Variables >>
 
 # Unix Epoch Time 基準
-[DateTime] $EpochOrigin = "1970/01/01 09:00:00"
+[DateTime] $EpochOrigin = "1970/01/01 00:00:00"
 
 
 [Int] $PostRequestTimeout = 3 * 1000 #リクエスト・タイムアウト（ms）
@@ -266,6 +266,7 @@ Function write-fluentd
 			# パイプで、オブジェクトが渡されたかチェック
 			If( $Data -eq $Null ){
 				Write-Error "There is no piped object."
+				Write-Output $False
 				return
 			}
 
@@ -273,6 +274,7 @@ Function write-fluentd
 			# オブジェクト配列[PSObject[]]であった場合は、エラーを返す
 			If( $Data -is [System.Array] ){
 				Write-Error "It is not an Object. (Objects array)"
+				Write-Output $False
 				return
 			}
 
@@ -342,5 +344,6 @@ Function write-fluentd
 
 		Write-Output $WriteFluentdResult
 	}
+
 }
 

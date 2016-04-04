@@ -11,51 +11,87 @@ $sut = (Split-Path -Leaf $MyInvocation.MyCommand.Path) -replace '\.Tests\.', '.'
 . ("{0}\write-fluentd.ps1" -f (Split-Path $MyInvocation.MyCommand.Path -Parent))
 
 # テスト用fluentdサーバー
-$TestServerUri = 'http://ls6:9880/'
+$ServerUri = 'http://ls6:9880/'
+$DebugTag = 'debug.pester'
 
 # テスト・オブジェクト生成 function定義
 Function Make-TestObject {
-
+	param
+	(
+		[Int] $ObjectsCount = 3 # テストで生成するオブジェクト数
+	)
     [System.Management.Automation.PSObject[]] $Objects = @()
 
-    # テストで生成するオブジェクト数
-    $ObjectsCount = 5
 
     For($i=1; $i -le $ObjectsCount; $i++)
     {
         $Objects += New-Object PSObject -Property @{
-            Name = "temperature"
-            MesuerdTime = [String] ( ([DateTime]::Now).ToString("yyyy/MM/dd HH:mm:ss") )
+            #Name = "temperature"
+			Location = "Tokyo"
+            #MesuerdTime = [String] ( ([DateTime]::Now).AddSeconds(-(Get-Random 100)).ToString("yyyy/MM/dd HH:mm:ss") )
             OutsideTemp = [float]( (Get-Random 200) / 10 - (Get-Random 200) / 10 )
             InsideTemp = [float]( 10 + (Get-Random 100) / 10)
         }
-        #生成時間をずらずため
-        Start-Sleep -Milliseconds (Get-Random 500)
+
+        $Objects += New-Object PSObject -Property @{
+            #Name = "temperature"
+			Location = "Osaka"
+            #MesuerdTime = [String] ( ([DateTime]::Now).AddSeconds(-(Get-Random 100)).ToString("yyyy/MM/dd HH:mm:ss") )
+            OutsideTemp = [float]( (Get-Random 200) / 10 - (Get-Random 200) / 10 )
+            InsideTemp = [float]( 10 + (Get-Random 100) / 10)
+        }
+
+
+        $Objects += New-Object PSObject -Property @{
+            #Name = "temperature"
+			Location = "Fukuoka"
+            #MesuerdTime = [String] ( ([DateTime]::Now).AddSeconds(-(Get-Random 100)).ToString("yyyy/MM/dd HH:mm:ss") )
+            OutsideTemp = [float]( (Get-Random 200) / 10 - (Get-Random 200) / 10 )
+            InsideTemp = [float]( 10 + (Get-Random 100) / 10)
+        }
+
     }
 
     Write-Output $Objects
 }
 
+Describe "Test-Environment" {
+    It "Post a sigle data to fluentd" {
+		Invoke-RestMethod `
+			-Uri ("{0}{1}" -f $ServerUri,$DebugTag) `
+			-Method POST `
+			-Body 'json={"action":"login","user":3}' `
+        | Should BeNullOrEmpty
+    }
+
+    It "Post multiple data (batch mode) to fluentd" {
+		Invoke-RestMethod `
+			-Uri ("{0}{1}" -f $ServerUri,$DebugTag) `
+			-Method POST `
+			-Body 'json=[{"action":"login","user":11},{"action":"login","user":12}]' `
+        | Should BeNullOrEmpty
+	}
+}
 
 
-Describe "function Invoke-HttpPost" {
-    It "jsonが、ASCIIのみ" {
-        Invoke-HttpPost`
-          -URI ("{0}/debug" -f $TestServerUri) `
+Describe "Invoke-HttpPost" {
+    It "json include only ASCII character" {
+        Invoke-HttpPost `
+          -URI ("{0}{1}" -f $ServerUri,$DebugTag) `
           -Body 'json={"InsideTemp":11.9,"time":"2001-01-01T01:01:01.0000000","Name":"temperature","OutsideTemp":7}' `
         | Should Be $true
     }
 
-    It "json valueが、ASCII文字以外" {
+    It "json-value include not ASCII character" {
         Invoke-HttpPost `
-          -URI ("{0}/debug" -f $TestServerUri) `
+          -URI ("{0}{1}" -f $ServerUri,$DebugTag) `
           -Body 'json={"InsideTemp":11.9,"time":"2001-01-01T01:01:01.0000000","Name":"温度","OutsideTemp":7}' `
         | Should Be $true
     }
 
-    It "json keyが、ASCII文字以外" {
+    It "json-key include not ASCII character" {
         Invoke-HttpPost `
-          -URI ("{0}/debug" -f $TestServerUri) `
+          -URI ("{0}{1}" -f $ServerUri,$DebugTag) `
           -Body 'json={"屋内温度":11.9,"time":"2001-01-01T01:01:01.0000000","名称":"temperature","屋外温度":7}' `
         | Should Be $true
     }
@@ -63,35 +99,37 @@ Describe "function Invoke-HttpPost" {
 }
 
 
+Describe "write-fluentd" {
+    It "post test" {
+        Make-TestObject `
+        | write-fluentd -Server $ServerUri `
+                         -tag 'influxdb.temperature' `
+                         -Strings ('Location') `
+                         -Time "MesuerdTime" `
+        | Should Be $true
+    }
+}
 
-Describe "function write-influx" {
+
+<#
+Describe "write-fluentd-err" {
     It "no data" {
-       "" `
-         | write-fluentd -Server $TestServerUri `
+       $null `
+         | write-fluentd -Server $ServerUri `
                          -tag 'debug' `
                          -Strings ('Name') `
                          -Time "MesuerdTime" `
-         | Should Be "There is no piped object."
+         | Should Be $false
     }
-
+	
     It "miss match data" {
-           write-fluentd -Server $TestServerUri `
+           write-fluentd -Server $ServerUri `
                          -tag 'debug' `
                          -Strings ('Name') `
                          -Time "MesuerdTime" `
                          -Data (Make-TestObject) `
-         | Should Be "It is not an Object. (Objects array)"
+         | Should Be  $false
     }
+	
 }
-
-
-Describe "Influxdb" {
-    It "post test" {
-        Make-TestObject `
-         | write-fluentd -Server $TestServerUri `
-                         -tag 'influxdb.test4' `
-                         -Strings ('Name') `
-                         -Time "MesuerdTime" `
-         | Should Be $true
-    }
-}
+#>
