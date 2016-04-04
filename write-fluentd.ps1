@@ -1,8 +1,5 @@
 # << Define Script Local Functions and Variables >>
 
-# Unix Epoch Time 基準
-[DateTime] $EpochOrigin = "1970/01/01 00:00:00"
-
 
 [Int] $PostRequestTimeout = 3 * 1000 #リクエスト・タイムアウト（ms）
 [Long] $PostBodyMaxSize = 1 * 1024 * 1024 #1MB 
@@ -15,7 +12,6 @@
 
 # JSONL Working Buffer
 [System.Text.StringBuilder] $JSONL = New-Object System.Text.StringBuilder( 1024 )
-
 
 # Preparating Buffer from multiple Data, And bulk posting to Fluentd
 Function PostBody-Add
@@ -105,20 +101,6 @@ Function Jsonl-End-Object
 	$JSONL.Remove( ($JSONL.Length - 1), 1) > $Null # 文字列最後の ","を削除
 	$JSONL.Append('}') > $Null
 }
-
-Function ConvertTo-UnixEpoch
-{
-	Param( [System.Object] $DateTime )
-
-	Try{
-		# return unix epoch time
-		(New-TimeSpan -Start (Get-Date $EpochOrigin) -End (Get-Date ([DateTime] $DateTime))).Totalseconds
-	} Catch {
-		Write-Error $Error[0].Exception.ErrorRecord
-		throw $_.Exception
-	}
-}
-
 
 function Invoke-HttpPost {
 	[CmdletBinding()]
@@ -219,7 +201,7 @@ Function write-fluentd
 		[Parameter(Mandatory=$true, Position=1)]
 			[String] $tag,
 		[Parameter(Position=2)]
-			[String[]] $Strings,
+			[String[]] $Values,
 		[Parameter(Position=3)]
 			[String] $Time,
 		[Parameter(Mandatory=$true, ValueFromPipeline=$true)]
@@ -285,39 +267,20 @@ Function write-fluentd
 
 			ForEach ($Prop in $Props)
 			{
-				# パラメータ -StringPropertys の指定有る場合
-				If ( ($Strings -ne $Null) -and ($Strings.Length -ne 0) )
+				# パラメータ -Values の指定有る場合
+				If ( ($Values -ne $Null) -and ($Values.Length -ne 0) )
 				{
-					If ( $Strings -contains ($Prop.Name) )
+					If ( $Values -contains ($Prop.Name) )
 					{
-						# StringPropertysとして指定されたプロパティは、JSONLに文字列として追加
-						Jsonl-Add-StringElement -Key $Prop.Name -Value ( $Data.($Prop.Name).ToString() ) #文字列
+						# Valuesで指定されたプロパティは、JSONLに""で括らずに（数値扱い）追加
+						Jsonl-Add-ValueElement -Key $Prop.Name -Value ( $Data.($Prop.Name).ToString() ) #数値扱い
 						continue
 					}
 				}
 
-				# パラメーター -TimeKey の指定有る場合
-				If ( ($Time -ne $Null) -and ($Time.Length -ne 0) )
-				{
-					If ( $Time -contains ($Prop.Name) )
-					{
-						# 時間を示すプロパティは、JSONLにUnixEpoch形式の時刻として追加
-						Jsonl-Add-ValueElement -Key 'time' -Value (ConvertTo-UnixEpoch ( $Data.($Prop.Name) ) )
-						#Jsonl-Add-StringElement -Key 'datetime' -Value (ConvertTo-ISO8601 ( $Data.($Prop.Name) ) )
-						continue
-					}
-				}
+				# それ以外のプロパティは、JSONLに""で括って（文字列扱い）追加
+				Jsonl-Add-StringElement -Key $Prop.Name -Value ( $Data.($Prop.Name).ToString() ) 
 
-				# それ以外のプロパティは、JSONLに数値として追加
-				Jsonl-Add-ValueElement -Key $Prop.Name -Value ( $Data.($Prop.Name).ToString() ) #非文字列
-
-			}
-
-			# パラメーター -TimeKey の指定が無い場合、現在時刻を設定
-			If ( ($Time -eq $Null) -or ($Time.Length -eq 0) )
-			{
-				Jsonl-Add-ValueElement -Key 'time' -Value (ConvertTo-UnixEpoch ([DateTime]::Now) )
-				#Jsonl-Add-StringElement -Key 'datetime' -Value (ConvertTo-ISO8601 ([DateTime]::Now) )				
 			}
 
 			Jsonl-End-Object
