@@ -5,7 +5,7 @@
 
 #Invoke-Pester -TestName "Invoke-HttpPost"
 
-Invoke-Pester -TestName "write-fluentd single"
+#Invoke-Pester -TestName "write-fluentd single"
 
-#Invoke-Pester -TestName "write-fluentd multi"
+Invoke-Pester -TestName "write-fluentd multi"
 

@@ -15,56 +15,35 @@ $ServerUri = 'http://ls6:9880/'
 $DebugTag = 'debug.pester'
 
 # テスト・オブジェクト生成 function定義
-Function Make-MultiTestObject {
+Function Make-SingleTestObject {
 	param
 	(
-		[Int] $ObjectsCount = 1 # テストで生成するオブジェクト数
+		[String] $location = "Tokyo"
 	)
+
+    New-Object PSObject -Property @{
+			location = $location
+            OutsideTemp = [float]( (Get-Random 200) / 10 - (Get-Random 200) / 10 )
+            InsideTemp = [float]( 10 + (Get-Random 100) / 10)
+    }
+
+}
+
+Function Make-MultiTestObject {
+
+	[Int] $ObjectsCount = 1 # テストで生成するオブジェクト数
+
     [System.Management.Automation.PSObject[]] $Objects = @()
 
 
     For($i=1; $i -le $ObjectsCount; $i++)
     {
-        $Objects += New-Object PSObject -Property @{
-            #Name = "temperature"
-			location = "Tokyo"
-            #MesuerdTime = [String] ( ([DateTime]::Now).AddSeconds(-(Get-Random 100)).ToString("yyyy/MM/dd HH:mm:ss") )
-            OutsideTemp = [float]( (Get-Random 200) / 10 - (Get-Random 200) / 10 )
-            InsideTemp = [float]( 10 + (Get-Random 100) / 10)
-        }
-
-        $Objects += New-Object PSObject -Property @{
-            #Name = "temperature"
-			location = "Osaka"
-            #MesuerdTime = [String] ( ([DateTime]::Now).AddSeconds(-(Get-Random 100)).ToString("yyyy/MM/dd HH:mm:ss") )
-            OutsideTemp = [float]( (Get-Random 200) / 10 - (Get-Random 200) / 10 )
-            InsideTemp = [float]( 10 + (Get-Random 100) / 10)
-        }
-
-
-        $Objects += New-Object PSObject -Property @{
-            #Name = "temperature"
-			location = "Fukuoka"
-            #MesuerdTime = [String] ( ([DateTime]::Now).AddSeconds(-(Get-Random 100)).ToString("yyyy/MM/dd HH:mm:ss") )
-            OutsideTemp = [float]( (Get-Random 200) / 10 - (Get-Random 200) / 10 )
-            InsideTemp = [float]( 10 + (Get-Random 100) / 10)
-        }
-
+        $Objects += Make-SingleTestObject -location "Tokyo"
+        $Objects += Make-SingleTestObject -location "Osaka"
+        $Objects += Make-SingleTestObject -location "Fukuoka"
     }
 
     Write-Output $Objects
-}
-
-Function Make-SingleTestObject {
-
-    New-Object PSObject -Property @{
-            #Name = "temperature"
-			location = "Tokyo"
-            #MesuerdTime = [String] ( ([DateTime]::Now).AddSeconds(-(Get-Random 100)).ToString("yyyy/MM/dd HH:mm:ss") )
-            OutsideTemp = [float]( (Get-Random 200) / 10 - (Get-Random 200) / 10 )
-            InsideTemp = [float]( 10 + (Get-Random 100) / 10)
-    }
-
 }
 
 Describe "Test-Environment" {
@@ -113,8 +92,8 @@ Describe "write-fluentd single" {
     It "post test" {
         Make-SingleTestObject `
         | write-fluentd -Server $ServerUri `
-                         -tag 'influxdb.temperature' `
-                         -Values ('InsideTemp','OutsideTemp')  | Should BeNullOrEmpty
+                        -tag 'influxdb.temperature' `
+                        -text ('location') -Verbose  | Should BeNullOrEmpty
     }
 }
 
@@ -122,8 +101,8 @@ Describe "write-fluentd multi" {
     It "post test" {
         Make-MultiTestObject `
         | write-fluentd -Server $ServerUri `
-                         -tag 'influxdb.temperature' `
-                         -Values ('InsideTemp','OutsideTemp') | Should BeNullOrEmpty
+                        -tag 'influxdb.temperature' `
+                        -text ('location') -Verbose | Should BeNullOrEmpty
     }
 }
 
