@@ -16,20 +16,20 @@ Download "write-fluentd.ps1" and use with dot operator
 ## Usage
 
 ```
-Do-SomeCmdlet | write-fluentd ?server 'http://fluentd-server:9880/' `
+Do-SomeCmdlet | write-fluentd -server 'http://fluentd-server:9880/' `
                               -tag    'net.somecmdlet' `
                               -text   'location'
 ```
 
-### server
+### -server
 
 Protocol (http or https), fluentd server FQDN, and port number
 
-### tag
+### -tag
 
 fluentd tag
 
-### text
+### -text
 
 specify the fields for text properties (not value fields) by String Array
 
